@@ -287,7 +287,7 @@ export function mountGlossariesFeature({
     }
   }
 
-  async function applyImport(mode: unknown = "append") {
+  async function applyImport(mode: unknown = "append", preparedCsv?: unknown) {
     if (importBusy) return;
     const csvText = viewPort.readCsvText();
     if (!csvText.trim()) {
@@ -300,7 +300,7 @@ export function mountGlossariesFeature({
     importBusy = true;
     viewPort.setStatus("正在解析术语...");
     try {
-      const payload = (await parseGlossaryCsv(apiPrefix, csvText)) as { entries?: Array<Partial<GlossaryEntryRow>>; entry_count?: number; duplicate_count?: number } | undefined;
+      const payload = (await parseGlossaryCsv(apiPrefix, typeof preparedCsv === "string" ? preparedCsv : csvText)) as { entries?: Array<Partial<GlossaryEntryRow>>; entry_count?: number; duplicate_count?: number } | undefined;
       if (requestSeq !== selectRequestSeq) return;
       if (originalDraft !== JSON.stringify(viewPort.readDraft?.() ?? viewPort.readEditorPayload()) || csvText !== viewPort.readCsvText()) {
         viewPort.setStatus("解析期间内容已修改，请重新导入；当前草稿未修改。", "error");

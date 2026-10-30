@@ -6,6 +6,8 @@
 // 写 store(updateEntryField),不再手写行级 DOM 增删。
 
 import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ConfirmDialog } from "@/ui/components/confirm-dialog.js";
 import { EmptyState } from "@/ui/icons/EmptyState.jsx";
 import { GLOSSARY_DOM_IDS, ENTRY_LEVEL_OPTIONS, MATCH_MODE_OPTIONS } from "./glossaries-dom-ids.js";
 import type { GlossaryEntryRow } from "../domain/glossaries-store.js";
@@ -14,22 +16,36 @@ export type GlossaryEditorProps = {
   entries: GlossaryEntryRow[];
   onFieldChange: (index: number, field: keyof GlossaryEntryRow, value: string) => void;
   onRemoveRow: (index: number) => void;
+  onRemoveRows?: (indices: number[]) => void;
   query?: string;
   disabled?: boolean;
 };
 
-export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, query = "", disabled = false }: GlossaryEditorProps) {
+export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, onRemoveRows, query = "", disabled = false }: GlossaryEditorProps) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  // Row indices change on import/deletion/library switches; stale selection must never delete another row.
+  useEffect(() => { setSelected(new Set()); setConfirmOpen(false); }, [entries]);
   const filtered = entries.map((row, index) => ({ row, index })).filter(({ row }) =>
     [row.source, row.target, row.note, row.context].some(value => (value || "").toLowerCase().includes(query.trim().toLowerCase())));
   const hasEntries = filtered.length > 0;
   return (
+    <>
+    <div className="glossary-entry-tools">
+      <span className="glossary-help">显示 {filtered.length} 条 · 已选 {selected.size} 条</span>
+      <button id="glossary-delete-selected" type="button" className="app-button secondary" disabled={disabled || !selected.size} onClick={() => setConfirmOpen(true)}>删除所选</button>
+      {selected.size > 0 && <button type="button" className="app-button secondary" disabled={disabled} onClick={() => setSelected(new Set())}>取消选择</button>}
+    </div>
     <fieldset className="glossary-table-wrap" disabled={disabled} aria-label="术语词条">
       <table className="glossary-table">
         <thead>
           <tr>
+            <th className="glossary-col-select"><input type="checkbox" aria-label="选择全部可见词条" checked={filtered.length > 0 && filtered.every(({ index }) => selected.has(index))}
+              onChange={event => setSelected(previous => { const next = new Set(previous); filtered.forEach(({ index }) => event.target.checked ? next.add(index) : next.delete(index)); return next; })} /></th>
             <th className="glossary-col-source">原词</th>
             <th className="glossary-col-target">译文</th>
             <th className="glossary-col-note">备注</th>
+            <th className="glossary-col-context">语境</th>
             <th className="glossary-col-level">类型</th>
             <th className="glossary-col-match">匹配</th>
             <th className="glossary-col-action"></th>
@@ -39,6 +55,8 @@ export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, query = ""
           {filtered.map(({ row, index }) => (
             // eslint-disable-next-line react/no-array-index-key -- 行无稳定 id(旧世界也是纯位置化 DOM 行),索引键与旧行为等价
             <tr key={index} className="glossary-entry-row">
+              <td><input type="checkbox" aria-label={`选择词条 ${row.source || index + 1}`} checked={selected.has(index)}
+                onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(index); else next.delete(index); return next; })} /></td>
               <td>
                 <input
                   type="text"
@@ -66,6 +84,8 @@ export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, query = ""
                   onChange={(event) => onFieldChange(index, "note", event.target.value)}
                 />
               </td>
+              <td><input type="text" className="glossary-entry-context" aria-label={`语境 ${row.source || index + 1}`} placeholder="例如：机器学习" value={row.context}
+                onChange={event => onFieldChange(index, "context", event.target.value)} /></td>
               <td>
                 <select
                   className="glossary-entry-level"
@@ -112,5 +132,15 @@ export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, query = ""
         ) : null}
       </div>
     </fieldset>
+    <ConfirmDialog id="glossary-delete-entries-confirm" title="删除所选词条"
+      description={`将从当前草稿删除 ${selected.size} 条词条（包括筛选隐藏的已选词条），保存后生效。`}
+      confirmLabel="删除词条" tone="danger" level="nested" open={confirmOpen} pending={disabled} onOpenChange={setConfirmOpen}
+      onConfirm={() => {
+        if (disabled) return;
+        const indices = [...selected].sort((a, b) => b - a);
+        if (onRemoveRows) onRemoveRows(indices); else indices.forEach(onRemoveRow);
+        setSelected(new Set()); setConfirmOpen(false);
+      }} />
+    </>
   );
 }

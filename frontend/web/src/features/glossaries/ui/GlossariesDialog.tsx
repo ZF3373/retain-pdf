@@ -51,6 +51,7 @@ export function GlossariesDialog({ feature, view: viewFeature, open, dialogStore
       setName: (name: string) => unknown;
       updateEntryField: (payload: { index: number; field: string; value: unknown }) => unknown;
       removeEntryRow: (index: number) => unknown;
+      removeEntryRows: (indices: number[]) => unknown;
       setCsvText: (value: string) => unknown;
     };
   };
@@ -152,7 +153,7 @@ export function GlossariesDialog({ feature, view: viewFeature, open, dialogStore
                     onCsvTextChange={(value) => store.actions.setCsvText(value)}
                     busy={opBusy || view.loading}
                     onReadingChange={setFileReading}
-                    onApply={(mode) => { setEntryQuery(""); void runOp(() => handlers?.applyImport?.(mode)); }}
+                    onApply={(mode, csv) => { setEntryQuery(""); void runOp(() => handlers?.applyImport?.(mode, csv)); }}
                     onCancel={() => handlers?.hideImport?.()}
                   />
                   <GlossaryEditor
@@ -161,6 +162,7 @@ export function GlossariesDialog({ feature, view: viewFeature, open, dialogStore
                     disabled={busy}
                     onFieldChange={(index, field, value) => store.actions.updateEntryField({ index, field, value })}
                     onRemoveRow={(index) => store.actions.removeEntryRow(index)}
+                    onRemoveRows={(indices) => store.actions.removeEntryRows(indices)}
                   />
                 </div>
                 <DialogFooter className="glossary-footer">

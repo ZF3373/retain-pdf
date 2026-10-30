@@ -47,7 +47,7 @@ export type GlossaryEntryRow = {
   note: string;
   level: string;
   match_mode: string;
-  /** 编辑器不展示，但要原样带回去：PUT 是整表覆盖，丢了它保存一次就把词条的语境清空了。 */
+  /** 语境参与去重，编辑和保存时必须保留。 */
   context: string;
 };
 
@@ -104,6 +104,7 @@ export type GlossariesEditorActions = {
   addEntryRow(entry?: Partial<GlossaryEntryRow>): void;
   updateEntryField(payload?: { index?: number; field?: keyof GlossaryEntryRow; value?: string }): void;
   removeEntryRow(index: number): void;
+  removeEntryRows(indices: number[]): void;
   setCsvText(csvText?: string): void;
   clearCsvText(): void;
 };
@@ -286,6 +287,14 @@ export function createGlossariesViewFeature({
         editorSnapshot = {
           ...editorSnapshot,
           draft: { ...editorSnapshot.draft, entries },
+        };
+        emitEditor();
+      },
+      removeEntryRows(indices) {
+        const removed = new Set(indices);
+        editorSnapshot = {
+          ...editorSnapshot,
+          draft: { ...editorSnapshot.draft, entries: editorSnapshot.draft.entries.filter((_row, index) => !removed.has(index)) },
         };
         emitEditor();
       },
