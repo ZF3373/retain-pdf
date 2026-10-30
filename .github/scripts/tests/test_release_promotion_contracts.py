@@ -295,6 +295,34 @@ def test_desktop_promotion_verifies_checksums_before_publishing():
         assert "pattern: desktop-*-${{ github.sha }}" in body
 
 
+def test_desktop_release_ships_installers_and_a_checksummed_source_archive():
+    """发布出去的资产：三平台安装包 + 后端源码包。
+
+    校验和（SHA256SUMS.txt）只用于发布前的硬门禁，不作为资产上传；
+    源码包由 build_source_archive.py 从本 commit 的 git 树生成，
+    包内 SOURCE.json 的版本必须与本次发布的 tag 版本相等，否则硬失败。
+    """
+    action = text(ACTIONS / "publish-desktop-release" / "action.yml")
+    files = action[action.index("files: |"):]
+    assert "RetainPDF-Windows-${{ inputs.version }}-Setup.exe" in files
+    assert "RetainPDF-Linux-${{ inputs.version }}.deb" in files
+    assert "RetainPDF-Mac-${{ inputs.version }}.dmg" in files
+    assert "retainpdf-backend-${{ inputs.version }}.tar.gz" in files
+    assert "SHA256SUMS.txt" not in files, "校验和不该作为发布资产上传"
+
+    # 校验和改写到 runner 临时目录，仍然逐个比对 sha256。
+    assert "--check-files" in action
+    assert "--sums-out \"$RUNNER_TEMP/SHA256SUMS.txt\"" in action
+
+    # 源码包在发布之前构建，且版本与 tag 对齐。
+    build = action.index("Build backend source archive")
+    assert action.index("Verify release tag still targets this revision") < build < action.index(
+        "uses: softprops/action-gh-release@v3"
+    )
+    assert "build_source_archive.py" in action
+    assert 'archived" != "$RELEASE_VERSION' in action
+
+
 def test_docker_promotion_verifies_before_tagging_and_never_rebuilds():
     promote = job("release-docker.yml", "promote")
     assert "build-push-action" not in promote and "uses: ./.github/workflows" not in promote

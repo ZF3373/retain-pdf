@@ -35,13 +35,15 @@ runs:
         RELEASE_REVISION: ${{ inputs.revision }}
       run: |
         find "$ASSETS_DIR" -maxdepth 1 -type f -print | sort
+        # 校验和写到 assets-dir 之外：发布出去的只有安装包和源码包，
+        # 但逐个比对 sha256 的硬门禁照旧执行。
         python3 "$GITHUB_WORKSPACE/.github/scripts/release_candidate_manifest.py" verify-desktop \
           --dir "$ASSETS_DIR" \
           --version "$RELEASE_VERSION" \
           --revision "$RELEASE_REVISION" \
           --check-files \
-          --sums-out "$ASSETS_DIR/SHA256SUMS.txt"
-        cat "$ASSETS_DIR/SHA256SUMS.txt"
+          --sums-out "$RUNNER_TEMP/SHA256SUMS.txt"
+        cat "$RUNNER_TEMP/SHA256SUMS.txt"
 
     - name: Verify release tag still targets this revision
       shell: bash
@@ -59,6 +61,26 @@ runs:
           exit 1
         fi
 
+    # 源码包随安装包一起发：ops/release/build_source_archive.py 从本 commit 的
+    # git 树打包后端工作区（带 SOURCE.json 记录 revision / 版本 / 树号）。
+    # 它的 sha256 补进同一份校验和，下载后能对上这一版。
+    - name: Build backend source archive
+      shell: bash
+      env:
+        RELEASE_VERSION: ${{ inputs.version }}
+      run: |
+        archive="$GITHUB_WORKSPACE/${{ inputs.assets-dir }}/retainpdf-backend-${{ inputs.version }}.tar.gz"
+        python3 "$GITHUB_WORKSPACE/ops/release/build_source_archive.py" --output "$archive" --force
+        # 脚本按 backend/pyproject.toml 定版本，文件名按 tag 定；发版前提是两者相等，
+        # 这里再验一次，不一致就硬失败，不让包名和内容对不上。
+        archived="$(python3 -c 'import json,sys,tarfile; a=tarfile.open(sys.argv[1]); m=next(n for n in a.getnames() if n.endswith("/SOURCE.json")); print(json.loads(a.extractfile(m).read())["version"])' "$archive")"
+        if [ "$archived" != "$RELEASE_VERSION" ]; then
+          echo "source archive declares version $archived but this release is $RELEASE_VERSION" >&2
+          exit 1
+        fi
+        sha256sum "$archive" >> "$RUNNER_TEMP/SHA256SUMS.txt"
+        cat "$RUNNER_TEMP/SHA256SUMS.txt"
+
     - name: Publish complete desktop release
       uses: softprops/action-gh-release@v3
       with:
@@ -70,4 +92,4 @@ runs:
           ${{ inputs.assets-dir }}/RetainPDF-Windows-${{ inputs.version }}-Setup.exe
           ${{ inputs.assets-dir }}/RetainPDF-Linux-${{ inputs.version }}.deb
           ${{ inputs.assets-dir }}/RetainPDF-Mac-${{ inputs.version }}.dmg
-          ${{ inputs.assets-dir }}/SHA256SUMS.txt
+          ${{ inputs.assets-dir }}/retainpdf-backend-${{ inputs.version }}.tar.gz
