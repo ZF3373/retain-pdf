@@ -71,6 +71,7 @@ export type GlossaryEditorPayload = {
 };
 
 export type GlossariesViewState = {
+  loading: boolean;
   items: GlossaryListItem[];
   selectedId: string;
   status: { message: string; tone: string };
@@ -78,6 +79,7 @@ export type GlossariesViewState = {
 };
 
 export type GlossariesViewActions = {
+  setLoading(state: GlossariesViewState, loading: boolean): GlossariesViewState;
   setList(
     state: GlossariesViewState,
     payload?: { items?: GlossaryListItem[]; selectedId?: string },
@@ -92,11 +94,12 @@ export type GlossariesViewActions = {
 /** 编辑器态(store 之外,由 editorRef 持有 + editor 订阅分发) */
 export type GlossariesEditorState = {
   draft: GlossaryDraft;
+  savedDraft: GlossaryDraft;
   csvText: string;
 };
 
 export type GlossariesEditorActions = {
-  setDraft(payload?: { name?: string; entries?: Array<Partial<GlossaryEntryRow> | GlossaryEntryRow> }): void;
+  setDraft(payload?: { name?: string; entries?: Array<Partial<GlossaryEntryRow> | GlossaryEntryRow> }, options?: { markSaved?: boolean }): void;
   setName(name?: string): void;
   addEntryRow(entry?: Partial<GlossaryEntryRow>): void;
   updateEntryField(payload?: { index?: number; field?: keyof GlossaryEntryRow; value?: string }): void;
@@ -114,11 +117,13 @@ export type GlossariesEditorPort = {
 export type GlossariesViewStore = Store<GlossariesViewState, GlossariesViewActions>;
 
 export type GlossariesViewPort = {
+  setLoading?: (loading: boolean) => unknown;
   openDialog: () => unknown;
   closeDialog: () => unknown;
   setStatus: (message?: string, tone?: string) => unknown;
   renderList: (items?: GlossaryListItem[], selectedId?: string) => unknown;
-  renderEditor: (detail?: { name?: string; entries?: Array<Partial<GlossaryEntryRow>> }) => unknown;
+  renderEditor: (detail?: { name?: string; entries?: Array<Partial<GlossaryEntryRow>> }, options?: { markSaved?: boolean }) => unknown;
+  readDraft?: () => GlossaryDraft;
   addEntryRow: (entry?: Partial<GlossaryEntryRow>) => unknown;
   readEditorPayload: () => GlossaryEditorPayload;
   setImportVisible: (visible?: boolean) => unknown;
@@ -193,12 +198,14 @@ export function createGlossariesViewFeature({
   const store = createStore<GlossariesViewState, GlossariesViewActions>({
     name: "glossariesView",
     initialState: {
+      loading: false,
       items: [],
       selectedId: "",
       status: { message: "", tone: "" },
       importVisible: false,
     },
     actions: {
+      setLoading(currentState, loading) { return { ...currentState, loading }; },
       setList(currentState, { items = [], selectedId = "" } = {}) {
         return { ...currentState, items, selectedId };
       },
@@ -215,6 +222,7 @@ export function createGlossariesViewFeature({
   // 快照引用稳定(仅变更时替换),可直接作 useSyncExternalStore 的 getSnapshot。
   let editorSnapshot: GlossariesEditorState = {
     draft: { name: "", entries: [] },
+    savedDraft: { name: "", entries: [] },
     csvText: "",
   };
   const editorListeners = new Set<(snapshot: GlossariesEditorState) => void>();
@@ -234,10 +242,12 @@ export function createGlossariesViewFeature({
       };
     },
     actions: {
-      setDraft({ name = "", entries = [] } = {}) {
+      setDraft({ name = "", entries = [] } = {}, { markSaved = true } = {}) {
+        const draft = { name, entries: entries.map((entry) => normalizeEntryForRow(entry)) };
         editorSnapshot = {
           ...editorSnapshot,
-          draft: { name, entries: entries.map((entry) => normalizeEntryForRow(entry)) },
+          draft,
+          savedDraft: markSaved ? draft : editorSnapshot.savedDraft,
         };
         emitEditor();
       },
@@ -301,11 +311,13 @@ export function createGlossariesViewFeature({
   const handlersRef: { current: HandlersBag | null } = { current: null };
 
   const viewPort = {
+    setLoading: (loading: boolean) => store.actions.setLoading(loading),
     openDialog: () => dialogStore.open(),
     closeDialog: () => dialogStore.close(),
     setStatus: (message = "", tone = "") => store.actions.setStatus({ message, tone }),
     renderList: (items: GlossaryListItem[] = [], selectedId = "") => store.actions.setList({ items, selectedId }),
-    renderEditor: (detail: { name?: string; entries?: Array<Partial<GlossaryEntryRow>> } = {}) => editor.actions.setDraft(detail),
+    renderEditor: (detail: { name?: string; entries?: Array<Partial<GlossaryEntryRow>> } = {}, options?: { markSaved?: boolean }) => editor.actions.setDraft(detail, options),
+    readDraft: () => editor.getSnapshot().draft,
     addEntryRow: (entry: Partial<GlossaryEntryRow> = {}) => editor.actions.addEntryRow(entry),
     readEditorPayload: () => readEditorPayload(editor.getSnapshot().draft),
     setImportVisible: (visible = false) => store.actions.setImportVisible(visible),

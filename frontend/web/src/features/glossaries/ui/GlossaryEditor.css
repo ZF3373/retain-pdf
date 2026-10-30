@@ -180,6 +180,7 @@
 
 @utility glossary-editor-scroll {
   display: grid;
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 8px;
   min-height: 0;
@@ -207,6 +208,9 @@
 }
 
 @utility glossary-table-wrap {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
   min-height: 0;
   overflow-y: visible;
   overflow-x: auto;
