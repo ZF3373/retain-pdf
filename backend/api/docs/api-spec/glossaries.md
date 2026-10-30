@@ -89,10 +89,18 @@ CSV export:
 
 Recommended import flow:
 
-1. The user pastes CSV / TSV text into the import box.
+1. The user selects/drops a CSV, TSV or TXT file (up to 2 MiB), or pastes CSV / TSV text into the import box.
+   Files are decoded locally: automatic UTF-8 / GB18030 and BOM-marked UTF-16, with a manual encoding selector.
 2. Frontend calls `POST /api/v1/glossaries/parse-csv`.
-3. Frontend shows normalized rows for review.
+3. Frontend appends/merges normalized rows into the draft by default (same source/context key as the server,
+   imported entries win), or replaces the draft entries when explicitly selected. Duplicate counts are shown.
+   Empty results, parse errors and merged results over 200 entries leave the draft intact.
 4. Frontend saves with `POST /api/v1/glossaries` or `PUT /api/v1/glossaries/{glossary_id}`.
+   Pending import text must be applied or cleared first. Importing alone does not persist the glossary.
+
+The manager includes library/entry search, a CSV template download, and unsaved-change confirmation before
+switching libraries, creating another glossary or closing the dialog. Filtering entries does not change their
+edit/delete indexes or remove hidden entries from the saved payload.
 
 Jobs and reruns: a job stores a snapshot (merged `translation.glossary_entries`) plus the user's inline entries
 (`translation.glossary_inline_entries`). Rerun / stage retry that create a new job re-resolve against the current

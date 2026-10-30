@@ -14,12 +14,16 @@ export type GlossaryEditorProps = {
   entries: GlossaryEntryRow[];
   onFieldChange: (index: number, field: keyof GlossaryEntryRow, value: string) => void;
   onRemoveRow: (index: number) => void;
+  query?: string;
+  disabled?: boolean;
 };
 
-export function GlossaryEditor({ entries, onFieldChange, onRemoveRow }: GlossaryEditorProps) {
-  const hasEntries = entries.length > 0;
+export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, query = "", disabled = false }: GlossaryEditorProps) {
+  const filtered = entries.map((row, index) => ({ row, index })).filter(({ row }) =>
+    [row.source, row.target, row.note, row.context].some(value => (value || "").toLowerCase().includes(query.trim().toLowerCase())));
+  const hasEntries = filtered.length > 0;
   return (
-    <div className="glossary-table-wrap">
+    <fieldset className="glossary-table-wrap" disabled={disabled} aria-label="术语词条">
       <table className="glossary-table">
         <thead>
           <tr>
@@ -32,7 +36,7 @@ export function GlossaryEditor({ entries, onFieldChange, onRemoveRow }: Glossary
           </tr>
         </thead>
         <tbody id={GLOSSARY_DOM_IDS.entries}>
-          {entries.map((row, index) => (
+          {filtered.map(({ row, index }) => (
             // eslint-disable-next-line react/no-array-index-key -- 行无稳定 id(旧世界也是纯位置化 DOM 行),索引键与旧行为等价
             <tr key={index} className="glossary-entry-row">
               <td>
@@ -102,11 +106,11 @@ export function GlossaryEditor({ entries, onFieldChange, onRemoveRow }: Glossary
         {!hasEntries ? (
           <EmptyState
             instrument="spectrum"
-            title="暂无词条"
-            hint="添加原词与译文，翻译时会优先用你的术语。"
+            title={query.trim() ? "没有匹配的词条" : "暂无词条"}
+            hint={query.trim() ? "试试其他关键词，或清空搜索查看全部词条。" : "添加原词与译文，翻译时会优先用你的术语。"}
           />
         ) : null}
       </div>
-    </div>
+    </fieldset>
   );
 }
