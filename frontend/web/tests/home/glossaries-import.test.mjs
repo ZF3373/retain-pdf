@@ -46,8 +46,8 @@ test("merge follows case and context keys, keeps incomplete edits, and incoming 
 });
 
 test("merge enforces the limit after deduplication without truncating the draft", () => {
-  const base = Array.from({ length: 200 }, (_, i) => ({ source: `term${i}`, target: "译文" }));
-  assert.throws(() => mergeGlossaryEntries(base, [{ source: "extra", target: "新增" }], "append"), /200/);
-  assert.equal(base.length, 200);
-  assert.equal(mergeGlossaryEntries(base, [{ source: "term0", target: "更新" }], "append").entries.length, 200);
+  const base = Array.from({ length: 1000 }, (_, i) => ({ source: `term${i}`, target: "译文" }));
+  assert.throws(() => mergeGlossaryEntries(base, [{ source: "extra", target: "新增" }], "append"), /1000/);
+  assert.equal(base.length, 1000);
+  assert.equal(mergeGlossaryEntries(base, [{ source: "term0", target: "更新" }], "append").entries.length, 1000);
 });

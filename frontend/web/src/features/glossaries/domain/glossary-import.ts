@@ -1,18 +1,36 @@
 import type { GlossaryEntryRow } from "./glossaries-store.js";
+import { glossaryRowsToCsv } from "./glossary-import-table.js";
+export { parseGlossaryTable, previewGlossaryImport } from "./glossary-import-table.js";
 
-export const MAX_GLOSSARY_ENTRIES = 200;
+import { MAX_GLOSSARY_ENTRIES } from "./glossary-limits.js";
+export { MAX_GLOSSARY_ENTRIES } from "./glossary-limits.js";
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 export type GlossaryImportMode = "append" | "replace";
 export type GlossaryFileEncoding = "auto" | "utf-8" | "gb18030" | "utf-16le" | "utf-16be";
+export type GlossaryFileContent = { text: string; encoding: string; sheets?: Array<{ name: string; text: string }> };
 
 /** Read locally; only decoded text is sent to the existing CSV parser. */
-export async function readGlossaryFile(file: File, encoding: GlossaryFileEncoding = "auto") {
-  if (!/\.(csv|tsv|txt)$/i.test(file.name)) {
-    throw new Error("请选择 CSV、TSV 或 TXT 文件；Excel 工作簿请先另存为 CSV。 ");
+export async function readGlossaryFile(file: File, encoding: GlossaryFileEncoding = "auto"): Promise<GlossaryFileContent> {
+  if (!/\.(csv|tsv|txt|xlsx)$/i.test(file.name)) {
+    throw new Error("请选择 CSV、TSV、TXT 或 XLSX 文件；旧版 XLS 请另存为 XLSX 或 CSV。");
   }
   if (file.size > MAX_IMPORT_BYTES) throw new Error("文件超过 2 MB，请拆分后导入。");
   if (!file.size) throw new Error("文件为空，请选择包含词条的文件。");
   const bytes = new Uint8Array(await file.arrayBuffer());
+  if (/\.xlsx$/i.test(file.name)) {
+    try {
+      const { default: readExcelFile } = await import("read-excel-file/browser");
+      const workbook = await readExcelFile(bytes.buffer, { parseNumber: value => value });
+      const sheets = workbook.map(sheet => {
+        if (sheet.data.length > 10000 || sheet.data.some(row => row.length > 100)) throw new Error("工作表超过 10000 行或 100 列，请仅保留术语数据。");
+        return { name: sheet.sheet, text: glossaryRowsToCsv(sheet.data.map(row => row.map(value => value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? "")))) };
+      });
+      if (!sheets.length || sheets.every(sheet => !sheet.text.trim())) throw new Error("工作簿没有可导入的内容。");
+      return { text: (sheets.find(sheet => sheet.text.trim()) || sheets[0]).text, encoding: "Excel", sheets };
+    } catch (error) {
+      throw new Error(`无法读取 Excel：${error instanceof Error ? error.message : "文件损坏"}。请确认是未加密的 XLSX 文件。`);
+    }
+  }
   let detected = encoding === "auto" ? "utf-8" : encoding;
   let text: string;
   if (encoding === "auto" && bytes[0] === 0xff && bytes[1] === 0xfe) detected = "utf-16le";

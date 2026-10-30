@@ -19,7 +19,7 @@ async function mount(t) {
     fetchGlossary: async id => ({ glossary_id: id, name: id === "a" ? "化学" : "物理", entries: id === "a" ? [{ source: "water", target: "水" }, { source: "atom", target: "原子" }] : [] }),
     createGlossary: async () => ({}), updateGlossary: async () => ({}), deleteGlossary: async () => ({}), exportGlossaryCsv: async () => ({}),
     parseGlossaryCsv: async (_prefix, text) => {
-      assert.equal(text, "new,新词");
+      assert.equal(text, "source,target,note,level,match_mode,context\r\nnew,新词,,,,");
       return { entries: [{ source: "new", target: "新词" }], entry_count: 1, duplicate_count: 0 };
     },
   });
@@ -96,4 +96,19 @@ test("loading prevents file import and editing until the glossary is ready", asy
   }
   view.store.actions.setLoading(false); await wait(0);
   assert.equal(byId(dom, "glossary-import-btn").disabled, false);
+});
+
+test("context can be edited and filtered bulk deletion removes only selected rows", async t => {
+  const { view } = await mount(t);
+  const context = document.querySelector(".glossary-entry-context");
+  assert.ok(context, "context editor is visible");
+  typeInput(dom, context, "chemistry"); await wait(0);
+  assert.equal(view.viewPort.readEditorPayload().entries[0].context, "chemistry");
+  typeInput(dom, byId(dom, "glossary-entry-search"), "atom"); await wait(0);
+  click(dom, document.querySelector('[aria-label="选择全部可见词条"]')); await wait(0);
+  click(dom, byId(dom, "glossary-delete-selected")); await wait(0);
+  assert.equal(view.editor.getSnapshot().draft.entries.length, 2, "confirmation precedes deletion");
+  click(dom, byId(dom, "glossary-delete-entries-confirm-confirm")); await wait(0);
+  assert.deepEqual(view.editor.getSnapshot().draft.entries.map(e => e.source), ["water"]);
+  assert.equal(view.editor.getSnapshot().draft.entries[0].context, "chemistry");
 });
