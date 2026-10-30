@@ -57,11 +57,9 @@ def test_manual_docker_label_rejects_unsafe_values(tag: str) -> None:
         resolve_release_version(tag, allow_label=True)
 
 
-@pytest.mark.parametrize("workflow_name", ["release-desktop.yml", "release-docker.yml"])
-def test_release_workflows_accept_prefixed_and_unprefixed_version_tags(
-    workflow_name: str,
-) -> None:
-    workflow = (REPO_ROOT / ".github" / "workflows" / workflow_name).read_text(
+def test_desktop_release_accepts_prefixed_and_unprefixed_version_tags() -> None:
+    """只有桌面端发布还在打 tag 时自动跑；Docker 发布改成手动触发了。"""
+    workflow = (REPO_ROOT / ".github" / "workflows" / "release-desktop.yml").read_text(
         encoding="utf-8"
     )
 

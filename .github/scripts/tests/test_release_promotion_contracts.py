@@ -76,14 +76,16 @@ def condition(job_text: str) -> str | None:
 # ---------------------------------------------------------------- prebuild
 
 
-def test_prebuild_runs_only_for_main_pushes_and_manual_main_runs():
+def test_prebuild_runs_only_when_dispatched_manually():
+    """push main 不再预构建：发布只出安装包和源码包，推送时不该额外跑构建。
+
+    打 tag 找不到候选就走完整构建，产物一样，只是多花约 17 分钟。
+    """
     on = on_block(PREBUILD)
-    assert re.search(r"^  push:\n    branches:\n      - main\n", on, re.M)
+    assert "push:" not in on, "push 不该再触发预构建"
     assert "tags:" not in on
     assert "pull_request" not in on
     assert "workflow_dispatch" in on
-    # 只改文档的 commit 不预构建（这样的 commit 打 tag 会回退到完整构建）。
-    assert '"docs/**"' in on and '"**/*.md"' in on
     # dispatch 到别的分支时整条链路跳过（提升判定也只认 main 上的 run）。
     assert condition(job(PREBUILD, "prepare")) == "github.ref == 'refs/heads/main'"
 
@@ -101,13 +103,8 @@ def test_prebuild_uses_the_declared_version_and_the_shared_build_definitions():
     assert "resolve_declared_version.py" in prepare
     assert "version: ${{ steps.declared.outputs.version }}" in prepare
 
-    docker = job(PREBUILD, "docker")
-    assert "uses: ./.github/workflows/build-docker-images.yml" in docker
-    assert "version: ${{ needs.prepare.outputs.version }}" in docker
-    assert "push: true" in docker
-    # 每个 sha 一个可覆盖的候选标签，旧的由 prune 清理。
-    assert "candidate_tag: candidate-${{ github.sha }}\n" in docker
-    assert "secrets: inherit" not in docker
+    # 只预构建桌面端安装包：Docker 不在发布范围内，候选构建一并去掉。
+    assert "docker" not in jobs(PREBUILD), "预构建不该再产出 Docker 候选"
 
     desktop = job(PREBUILD, "desktop")
     assert "uses: ./.github/workflows/build-desktop-packages.yml" in desktop
@@ -120,16 +117,10 @@ def test_prebuild_does_not_rerun_the_test_suite():
     assert "tests.yml" not in workflow(PREBUILD)
 
 
-def test_candidate_pruning_is_best_effort_and_outlives_artifact_retention():
-    prune = job(PREBUILD, "prune-docker-candidates")
-    assert "    needs: docker\n" in prune
-    assert "    continue-on-error: true\n" in prune
-    assert "--max-age-days 10" in prune
-    assert '--keep "candidate-${GITHUB_SHA}"' in prune
-    # 只有它和 docker 构建需要 Docker Hub 凭据。
+def test_prebuild_holds_no_docker_credentials():
+    """预构建不再碰 Docker：整个工作流不该引用任何 secret。"""
     for name, body in jobs(PREBUILD).items():
-        if name not in {"docker", "prune-docker-candidates"}:
-            assert "secrets." not in body, name
+        assert "secrets." not in body, name
 
 
 def test_build_definitions_inject_the_requested_version_everywhere():

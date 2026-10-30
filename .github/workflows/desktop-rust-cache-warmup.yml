@@ -19,16 +19,8 @@ name: Desktop Rust Cache Warmup
 # 一是赶上 stable 工具链更新（rustc 版本进 key），二是刷新访问时间，防止 7 天
 # 未访问被 GitHub 淘汰。
 
+# push main 不再预热：只在每周定时和手动触发时跑。
 "on":
-  push:
-    branches:
-      - main
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "backend/**/Cargo.toml"
-      - "database/**/Cargo.toml"
-      - ".github/workflows/desktop-rust-cache-warmup.yml"
   schedule:
     # 每周一 03:17 UTC
     - cron: "17 3 * * 1"

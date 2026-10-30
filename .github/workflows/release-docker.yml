@@ -64,14 +64,7 @@ on:
         description: '目标平台（逗号分隔）'
         required: false
         default: 'linux/amd64,linux/arm64'
-  push:
-    tags:
-      - 'v[0-9]*.[0-9]*.[0-9]*'
-      - '[0-9]*.[0-9]*.[0-9]*'
-      # Desktop hotfix/prerelease tags are intentionally excluded. They used to
-      # start a second copy of the full quality gate plus two Docker builds.
-      - '!v*-*'
-      - '!*-*'
+  # 打 tag 不再发 Docker 镜像：发布只出安装包和源码包。需要时手动触发。
 
 permissions:
   contents: read

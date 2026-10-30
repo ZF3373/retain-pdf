@@ -7,27 +7,7 @@ name: Publish Current Web Image
         description: "目标平台（逗号分隔）"
         required: false
         default: "linux/amd64,linux/arm64"
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - ".github/workflows/publish-current-web.yml"
-      - ".dockerignore"
-      - "package.json"
-      - "package-lock.json"
-      - "frontend/web/scripts/build-workspace-packages.mjs"
-      - "ops/deployment/docker/Dockerfile.web"
-      - "ops/deployment/docker/entrypoint-web.sh"
-      - "ops/deployment/docker/nginx-mjs.types.conf"
-      - "ops/deployment/docker/nginx.conf.template"
-      - "frontend/desktop/package.json"
-      - "frontend/web/**"
-      - "frontend/packages/api/**"
-      - "frontend/packages/domain/**"
-      - "frontend/packages/reader/**"
-      - "contracts/**"
-      - "frontend/packages/ui/**"
+  # push main 不再自动构建 web 镜像：发布只出安装包和源码包。需要时手动触发。
 
 permissions:
   contents: read

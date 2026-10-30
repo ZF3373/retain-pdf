@@ -21,14 +21,10 @@ run-name: Prebuild Release Candidates · ${{ github.sha }}
 #
 # 只改文档不预构建（paths-ignore）；这样的 commit 打 tag 同样会回退到完整构建。
 
+# 只在手动触发时跑：push main 不再预构建。打 tag 时 release-desktop.yml 找不到
+# 候选就走完整构建，产出的安装包完全一样，只是多花约 17 分钟。
 "on":
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-  # 手动补一份候选（例如预构建 artifact 过期后又要在这个 commit 上发版）。
+  # 手动补一份候选（例如想让某个 commit 打 tag 时走提升而不是完整构建）。
   # 只接受 main：prepare 的 job 级条件会跳过其他分支，提升判定也只认 main 上的 run。
   workflow_dispatch: {}
 
@@ -71,21 +67,6 @@ jobs:
             echo "platform_matrix=$platform_matrix"
           } >> "$GITHUB_OUTPUT"
 
-  docker:
-    needs: prepare
-    permissions:
-      contents: read
-    uses: ./.github/workflows/build-docker-images.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      platforms: ${{ needs.prepare.outputs.platforms }}
-      platform_matrix: ${{ needs.prepare.outputs.platform_matrix }}
-      push: true
-      candidate_tag: candidate-${{ github.sha }}
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
   desktop:
     needs: prepare
     permissions:
@@ -94,38 +75,4 @@ jobs:
     with:
       version: ${{ needs.prepare.outputs.version }}
 
-  # 候选标签越积越多：删掉超过 10 天的 candidate-*（比 7 天 artifact 保留期更老，
-  # 不可能再被提升）。尽力而为，失败不影响本次预构建的结论。
-  prune-docker-candidates:
-    needs: docker
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Resolve Docker Hub namespace
-        id: hub
-        shell: bash
-        run: |
-          user="${{ secrets.DOCKERHUB_USERNAME }}"
-          if [ -z "$user" ]; then
-            user="${GITHUB_REPOSITORY_OWNER}"
-          fi
-          echo "user=${user}" >> "$GITHUB_OUTPUT"
-
-      - name: Prune stale candidate tags
-        shell: bash
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          IMAGE_NAMESPACE: ${{ steps.hub.outputs.user }}
-        run: |
-          python3 .github/scripts/prune_docker_candidate_tags.py \
-            --namespace "$IMAGE_NAMESPACE" \
-            --repo retainpdf-app \
-            --repo retainpdf-web \
-            --max-age-days 10 \
-            --keep "candidate-${GITHUB_SHA}"

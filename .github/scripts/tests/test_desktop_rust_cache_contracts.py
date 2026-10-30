@@ -97,15 +97,17 @@ def test_cache_key_env_is_not_overridden():
         ) is None, workflow
 
 
-def test_warmup_runs_on_main_only_and_never_on_tags():
+def test_warmup_runs_on_schedule_and_manual_dispatch_only():
+    """push main 不再预热：发布只出安装包和源码包，推送时不该额外跑构建。
+
+    预热只剩每周定时（保住缓存不被 7 天淘汰）和手动触发。
+    """
     source = _source(WARMUP)
     on_block = re.search(r'^"on":\n(.*?)(?=^\S)', source, re.M | re.S).group(1)
-    assert re.search(r"^  push:\n    branches:\n      - main\n", on_block, re.M)
-    assert "tags:" not in on_block
+    assert "push:" not in on_block, "push 不该再触发预热"
     assert "pull_request" not in on_block
     assert "schedule:" in on_block
-    for manifest in ('"Cargo.toml"', '"Cargo.lock"', '"backend/**/Cargo.toml"', '"database/**/Cargo.toml"'):
-        assert manifest in on_block
+    assert "workflow_dispatch:" in on_block
     # 预热只编译，不需要任何写权限或 secret。
     assert "contents: read" in source
     assert "secrets." not in source
