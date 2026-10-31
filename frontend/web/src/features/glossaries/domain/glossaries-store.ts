@@ -96,6 +96,9 @@ export type GlossariesEditorState = {
   draft: GlossaryDraft;
   savedDraft: GlossaryDraft;
   csvText: string;
+  // 行结构版本：只在整表替换/增删行时 +1，改字段不动。勾选是按行号记的，
+  // 编辑区靠它判断"行号还指不指同一行"（改输入框不该把勾选清掉）。
+  structureRevision: number;
 };
 
 export type GlossariesEditorActions = {
@@ -225,6 +228,7 @@ export function createGlossariesViewFeature({
     draft: { name: "", entries: [] },
     savedDraft: { name: "", entries: [] },
     csvText: "",
+    structureRevision: 0,
   };
   const editorListeners = new Set<(snapshot: GlossariesEditorState) => void>();
 
@@ -249,6 +253,7 @@ export function createGlossariesViewFeature({
           ...editorSnapshot,
           draft,
           savedDraft: markSaved ? draft : editorSnapshot.savedDraft,
+          structureRevision: editorSnapshot.structureRevision + 1,
         };
         emitEditor();
       },
@@ -266,6 +271,7 @@ export function createGlossariesViewFeature({
             ...editorSnapshot.draft,
             entries: [...editorSnapshot.draft.entries, normalizeEntryForRow(entry)],
           },
+          structureRevision: editorSnapshot.structureRevision + 1,
         };
         emitEditor();
       },
@@ -287,6 +293,7 @@ export function createGlossariesViewFeature({
         editorSnapshot = {
           ...editorSnapshot,
           draft: { ...editorSnapshot.draft, entries },
+          structureRevision: editorSnapshot.structureRevision + 1,
         };
         emitEditor();
       },
@@ -295,6 +302,7 @@ export function createGlossariesViewFeature({
         editorSnapshot = {
           ...editorSnapshot,
           draft: { ...editorSnapshot.draft, entries: editorSnapshot.draft.entries.filter((_row, index) => !removed.has(index)) },
+          structureRevision: editorSnapshot.structureRevision + 1,
         };
         emitEditor();
       },

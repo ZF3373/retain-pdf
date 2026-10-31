@@ -158,6 +158,7 @@ export function GlossariesDialog({ feature, view: viewFeature, open, dialogStore
                   />
                   <GlossaryEditor
                     entries={view.draft.entries}
+                    structureRevision={view.structureRevision}
                     query={entryQuery}
                     disabled={busy}
                     onFieldChange={(index, field, value) => store.actions.updateEntryField({ index, field, value })}

@@ -14,6 +14,8 @@ import type { GlossaryEntryRow } from "../domain/glossaries-store.js";
 
 export type GlossaryEditorProps = {
   entries: GlossaryEntryRow[];
+  /** 行结构版本（整表替换/增删行时 +1，改字段不动），用来判断旧勾选是否还指向同一行。 */
+  structureRevision: number;
   onFieldChange: (index: number, field: keyof GlossaryEntryRow, value: string) => void;
   onRemoveRow: (index: number) => void;
   onRemoveRows?: (indices: number[]) => void;
@@ -21,11 +23,12 @@ export type GlossaryEditorProps = {
   disabled?: boolean;
 };
 
-export function GlossaryEditor({ entries, onFieldChange, onRemoveRow, onRemoveRows, query = "", disabled = false }: GlossaryEditorProps) {
+export function GlossaryEditor({ entries, structureRevision, onFieldChange, onRemoveRow, onRemoveRows, query = "", disabled = false }: GlossaryEditorProps) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // Row indices change on import/deletion/library switches; stale selection must never delete another row.
-  useEffect(() => { setSelected(new Set()); setConfirmOpen(false); }, [entries]);
+  // 勾选按行号记，只有切换术语表/导入/增删行（行号不再指同一行）才清；改原词译文不能清，
+  // 否则每敲一个字勾选就没了。
+  useEffect(() => { setSelected(new Set()); setConfirmOpen(false); }, [structureRevision]);
   const filtered = entries.map((row, index) => ({ row, index })).filter(({ row }) =>
     [row.source, row.target, row.note, row.context].some(value => (value || "").toLowerCase().includes(query.trim().toLowerCase())));
   const hasEntries = filtered.length > 0;

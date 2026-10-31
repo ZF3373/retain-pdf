@@ -12,7 +12,7 @@ test("long import panels scroll without overlapping entry rows at desktop and mo
   try {
     const css = readFileSync(new URL("../../dist/css/home.css", import.meta.url), "utf8");
     const panel = renderToStaticMarkup(createElement(GlossaryImportPanel, { visible: true, csvText: "cat,猫", onCsvTextChange() {}, onApply() {}, onCancel() {} }));
-    const editor = renderToStaticMarkup(createElement(GlossaryEditor, { entries: [{ source: "cat", target: "猫", note: "", level: "preferred", match_mode: "exact", context: "" }], onFieldChange() {}, onRemoveRow() {} }));
+    const editor = renderToStaticMarkup(createElement(GlossaryEditor, { entries: [{ source: "cat", target: "猫", note: "", level: "preferred", match_mode: "exact", context: "" }], structureRevision: 0, onFieldChange() {}, onRemoveRow() {} }));
     const page = await browser.newPage();
     for (const width of [500, 300]) {
       await page.setViewportSize({ width: width + 40, height: 500 });
