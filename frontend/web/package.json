@@ -73,7 +73,7 @@
     "react-dom": "^19.2.7",
     "react-pdf": "^9.2.1",
     "react-resizable-panels": "4.12.1",
-    "read-excel-file": "9.3.13",
+    "read-excel-file": "9.3.12",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   },
